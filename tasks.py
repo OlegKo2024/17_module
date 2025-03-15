@@ -24,7 +24,7 @@ router = APIRouter(
 # Это аннотация типа, которая помогает: Улучшить читаемость кода. Проверить типы данных на этапе разработки (например,
 # с помощью инструментов вроде mypy). Получить подсказки в IDE (например, PyCharm. Однако, Python не проверяет типы
 # данных во время выполнения, поэтому эта аннотация не накладывает ограничений на содержимое списка
-tasks: list[Task] = []
+tasks: list[Task] = []  # Список tasks хранит объекты типа Task.
 
 
 @router.get("/", response_model=list[Task])
@@ -40,7 +40,7 @@ async def task_by_id(task_id: int):     # task_id: int НЕ task_id: Task
     raise HTTPException(status_code=404, detail="Задача не найдена")
 
 
-@router.post("/create", response_model=Task)
+@router.post("/create", response_model=Task)    # FastAPI ждет, что функция вернёт объект типа response_model=Task
 async def create_task(task: CreateTask):
     if any(task.title == t.title for t in tasks):
         raise HTTPException(status_code=400, detail="Task already exists")
