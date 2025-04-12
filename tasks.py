@@ -1,99 +1,110 @@
 """
-В модуле task.py напишите APIRouter с префиксом '/task' и тегом 'task', а также следующие маршруты, с пустыми функциями:
-    get '/' с функцией all_tasks.
-    get '/task_id' с функцией task_by_id.
-    post '/create' с функцией create_task.
-    put '/update' с функцией update_task.
-    delete '/delete' с функцией delete_task.
+В модуле task.py создайте модель Task, наследованную от ранее написанного Base со следующими атрибутами:
 
-В случае ниже не обязательно делать все функции async в FastAPI. Использование async зависит от того, выполняет ли
-функция асинхронные операции (например, запросы к базе данных, вызовы внешних API и т. д.). Здесь этого нет.
-"""
-
-from fastapi import APIRouter, HTTPException
-from mtasks.schemas import Task, CreateTask, UpdateTask
-
-router = APIRouter(
-    prefix="/task",
-    tags=["Task"],
-)
-
-# список объектов
-# Типизация users: list[User] = []:
-# Запись users: list[User] = [] значит, что переменная users является списком и должен содержать только объекты типа User
-# Это аннотация типа, которая помогает: Улучшить читаемость кода. Проверить типы данных на этапе разработки (например,
-# с помощью инструментов вроде mypy). Получить подсказки в IDE (например, PyCharm. Однако, Python не проверяет типы
-# данных во время выполнения, поэтому эта аннотация не накладывает ограничений на содержимое списка
-tasks: list[Task] = []  # Список tasks хранит объекты типа Task.
-
-
-@router.get("/", response_model=list[Task])
-async def get():
-    return tasks
-
-
-@router.get("/{task_id}", response_model=Task)
-async def task_by_id(task_id: int):     # task_id: int НЕ task_id: Task
-    for t in tasks:
-        if t.task_id == task_id:
-            return t
-    raise HTTPException(status_code=404, detail="Задача не найдена")
-
-
-@router.post("/create", response_model=Task)    # FastAPI ждет, что функция вернёт объект типа response_model=Task
-async def create_task(task: CreateTask):
-    if any(task.title == t.title for t in tasks):
-        raise HTTPException(status_code=400, detail="Task already exists")
-    new_id = max((t.task_id for t in tasks), default=0) + 1
-    new_task = Task(task_id=new_id, title=task.title, content=task.content, priority=task.priority)
-    tasks.append(new_task)
-    return new_task
-
-
-@router.put("/update", response_model=Task)
-async def update_task(task_id: int, task: UpdateTask):
-    for t in tasks:
-        if t.task_id == task_id:
-            t.title = task.title
-            t.content = task.content
-            t.priority = task.priority
-            return t
-    raise HTTPException(status_code=404, detail="Задача не найдена")
-
-
-@router.delete("/delete", response_model=dict)
-async def delete_task(task_id: int):
-    for i, t in enumerate(tasks):
-        if t.task_id == task_id:
-            del tasks[i]    # .remove(элемент) не подходит - надо указать элемент списка, не индекс
-            # del_task = tasks.pop(i)
-            return {'Message': f'Task {task_id} {t.title} удален'}
-            # return {'Deleted Task': del_task}
-    raise HTTPException(status_code=404, detail="Задача не найдена")
-
-# @router.delete("/delete}")
-# def delete_task(task_id: int):
-#     """Удалить продукт"""
-#     global tasks
-#     tasks = [t for t in tasks if t.task_id != task_id]
-#     return {"message": f"Task {task_id} deleted"}
-
-# Если tasks — это список словарей, используйте t["task_id"].
-# Если tasks — это список объектов, используйте t.task_id и преобразуйте объект в словарь
+    __tablename__ = 'tasks'
+    id - целое число, первичный ключ, с индексом.
+    title - строка.
+    content - строка.
+    priority - целое число, по умолчанию 0.
+    completed - булевое значение, по умолчанию False.
+    user_id - целое число, внешний ключ на id из таблицы 'users', не NULL, с индексом.
+    slug - строка, уникальная, с индексом.
+    user - объект связи с таблицей User, где back_populates='tasks'.
 
 """
-    del t[i]: Удаляет элемент по индексу i из списка t и Не возвращает удалённый элемент
-t = [1, 2, 3, 4]
-del t[1]  # Удаляет элемент с индексом 1 (число 2)
-print(t)  # [1, 3, 4]
-    t.pop(i): Удаляет по индексу i и возвращает его. Если индекс не указан (t.pop()), удаляет и возвращает последний 
-элемент списка. Пример:
-t = [1, 2, 3, 4]
-removed_element = t.pop(1)  # Удаляет элемент с индексом 1 (число 2)
-print(t)  # [1, 3, 4]
-print(removed_element)  # 2
-    t.remove(x): Удаляет первый элемент в списке, значение которого равно x. Если элемент не найден, вызывает ValueError
-t = [1, 2, 3, 4, 2]
-t.remove(2)  # Удаляет первое вхождение числа 2
-print(t)  # [1, 3, 4, 2]
+
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from mtasks.backend.db import Base   # относительный от родительского пакета
+# Если нужен импорт из текущего пакета – используйте одну точку (.). Если из родительского – две точки (..).
+from sqlalchemy.orm import relationship
+
+
+class Task(Base):
+    __tablename__ = 'tasks'
+    task_id = Column(Integer, primary_key=True, index=True)
+    title = Column(String)
+    content = Column(String)
+    priority = Column(Integer, default=0)
+    completed = Column(Boolean, default=False)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False, index=True)  # Связь с User
+    slug = Column(String, unique=True, index=True)
+    user = relationship('User', back_populates='tasks') # ссылка на user
+
+#   ForeignKey("users.id")
+# Создает внешний ключ (FOREIGN KEY), ссылающийся на столбец id в таблице users.
+# Гарантирует целостность данных: нельзя вставить user_id, которого нет в users.id
+
+# Неявный nullable=False
+# По умолчанию Column имеет nullable=True, но для внешних ключей (ForeignKey) часто подразумевается NOT NULL.
+# Если нужно явно запретить NULL: user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+#   В SQLAlchemy, user в строке user = relationship('User', back_populates='tasks') — ссылка на объект класса User
+# user — это атрибут, который создается в классе, где определена эта строка (например, в классе Task).
+# Этот атрибут представляет собой ссылку на объект класса User, связанный с текущим объектом
+# (например, с объектом Task). См ниже.
+
+"""
+Ссылка в индексе — это указатель на физическое расположение строки в таблице. В большинстве случаев это не ID строки, 
+а внутренний идентификатор, который база данных использует для быстрого доступа к данным. Однако в некоторых базах 
+данных (например, SQLite) ссылка может совпадать с ROWID или первичным ключом (id), если он есть
+
+Индекс — это отдельная структура данных, которая хранится независимо от основной таблицы. Это не обязательно таблица в
+привычном смысле, а скорее оптимизированная для поиска структура
+
+Как работает поиск по индексу?
+Давайте разберем ваш пример:
+
+Таблица users:
+id	name	email
+1	Alice	alice@example.com
+2	Bob	    bob@example.com
+3	Charlie	charlie@example.com
+Индекс для колонки name:
+Значение (name)	Ссылка на строку
+Alice	1
+Bob	    2
+Charlie	3
+
+Запрос:
+SELECT * FROM users WHERE name = 'Alice';
+
+Шаги поиска:
+Поиск в индексе:
+    База данных ищет значение 'Alice' в индексе (в колонке Значение (name)).
+    Поскольку индекс отсортирован (например, это B-дерево), поиск происходит быстро.
+Получение ссылки:
+    В индексе для 'Alice' указана ссылка 1.
+Переход к данным в таблице:
+    База данных использует ссылку 1, чтобы найти строку в таблице users.
+В таблице users строка с id = 1 содержит данные:
+    id: 1, name: Alice, email: alice@example.com
+База данных возвращает строку:
+(1, 'Alice', 'alice@example.com')
+
+    Что такое users и id в user_id = Column(Integer, ForeignKey("users.id")) ?
+users — это имя таблицы в базе данных, которая хранит категории.
+id — это первичный ключ (primary key) таблицы categories. Он уникально идентифицирует каждую запись в таблице.
+    Что делает ForeignKey?
+ForeignKey("users.id") указывает, что колонка user_id в таблице tasks ссылается на колонку id в таблице
+users. Это создает внешний ключ (foreign key), который обеспечивает связь между таблицами.
+
+    slug = Column(String, unique=True, index=True)
+slug — это колонка в таблице базы данных, которая хранит строковые данные (тип String).
+Технически:
+В базе данных это будет колонка с именем slug, которая хранит строки.
+В Python-коде slug — это атрибут объекта, который представляет собой значение этой колонки.
+Пример:
+class Task(Base):
+    __tablename__ = 'tasks'
+    id = Column(Integer, primary_key=True)
+    slug = Column(String, unique=True, index=True)  # Колонка в таблице
+Если вы создаете объект Task: task = Task(slug="buy-groceries")
+То task.slug будет строкой "buy-groceries"
+
+    user = relationship('User', back_populates='tasks')
+user — это отношение (relationship), которое связывает текущий объект (Task) с объектом другого класса (User).
+Технически:
+В базе данных это реализуется через внешний ключ (foreign key), например, user_id, который ссылается на таблицу users.
+В Python-коде user — это атрибут объекта, который представляет собой ссылку на связанный объект класса User.
+
 """
