@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from mtasks.backend.db import engine, Base
 from mtasks.routers import tasks, users
 
 app = FastAPI()
@@ -7,6 +8,7 @@ app = FastAPI()
 
 app.include_router(tasks.router)
 app.include_router(users.router)
+
 
 @app.get("/")
 def root():
